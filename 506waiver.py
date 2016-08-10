@@ -39,6 +39,8 @@ class Photo():
 ## Write one line of code to create an instance of the photo class and store the instance in a variable my_photo.
 ## After you do that, my_photo.title should have the value "Photo1", my_photo.author should have the value "Ansel Adams" and my_photo.tags should have the value ['Nature', 'Mist', 'Mountain']).
 
+my_photo = Photo("Photo1","Ansel Adams",['Nature','Mist','Mountain'])
+
 # HINT: if you just call the constructor for the Photo class appropriately, everything will be taken care of for you. You just have to figure out, from the definition of the class, what to pass to the constructor. Remember the examples of creating a class instance from the textbook!
 
 
@@ -58,16 +60,20 @@ f.close()
 # Your job is to fill in the __init__ method
 class Photo2():
     def __init__(self, photo_d):
-        "Fill in this method"
+        self.title = photo_d['photo']['title']['_content']
+        self.author = photo_d['photo']['owner']['username']
+        self.tags = []
+        for tag in photo_d['photo']['tags']['tag']:
+        	self.tags.append(tag['raw'])
 
 # After you fill it in, try creating an instance by invoking Photo2(sample_d) and check to see if it has the values you expect for title, author, and tags.
 
+my_photo2 = Photo2(sample_d)
 
 ### PART 2: FlickR Tag Recommender
 
 
-
-flickr_key = None # paste your flickr key here, so the variable flickr_key contains a string (your flickr key!)
+flickr_key = "f7d4239fe2b51ac9457d6dc1254d352b" # paste your flickr key here, so the variable flickr_key contains a string (your flickr key!)
 if not flickr_key:
     flickr_key = raw_input("Enter your flickr API key, or paste it in the .py file to avoid this prompt in the future: \n>>")
 
@@ -88,7 +94,7 @@ try:
     fobj.close()
 except:
     raise Exception("Make sure you have cached_results.txt in the same directory as this code file.")
-    # saved_cache = {}
+    #saved_cache = {}
 
 def requestURL(baseurl, params = {}):
     req = requests.Request(method = 'GET', url = baseurl, params = params)
@@ -102,6 +108,7 @@ def get_with_caching(base_url, params_diction, cache_diction, cache_fname, omitt
             filtered_params_diction[k] = params_diction[k]
     full_url = requestURL(base_url, filtered_params_diction)
     # step 1
+    print full_url
     if full_url in cache_diction:
         # step 2
         logging.info("retrieving cached result for " + full_url)
@@ -121,17 +128,24 @@ def get_with_caching(base_url, params_diction, cache_diction, cache_fname, omitt
 
 # Get a response from flickr: data for 50 photos that are tagged with 'sunset'. Store the list of dictionaries in a variable called search_result_txt. See the textbook section on the flickr API, and see the documentation page at https://www.flickr.com/services/api/flickr.photos.search.html
 
+flickr_api_url = 'https://api.flickr.com/services/rest/'
+flickr_params = {'per_page':50,'format':'json','method': 'flickr.photos.search','tags':['sunset'],'api_key':'f7d4239fe2b51ac9457d6dc1254d352b'}
+search_result_txt = get_with_caching(flickr_api_url, flickr_params, saved_cache, cache_fname)
 
 # [PROBLEM 4] Extract and parse as json
 
 # search_result contains a long string, with the annoying extra characters that the flickr api adds at the beginning and end of its response text. Strip off the extra characters and turn the remaining json-formatted text string into a python dictionary. (Hint: see the flickr section of the UsingRESTAPIs chapter for a  reminder of how to do this.) Save the dictionary in a variable called search_result_diction
 
-
+def strip_extra_chars(flickr_response_text):
+	return flickr_response_text[14:-1]
+	
+search_result_diction = json.loads(strip_extra_chars(search_result_txt))
 
 # [PROBLEM 5] Extract a list of photo ids from the dictionary. Use a list comprehension or a call to map in order to do this.
 
 # REF: Read the chapter titled: "More on Accumulation: Map, Filter, Reduce, List Comprehensions, and Zip"
 
+photo_ids_list = [photo['id'] for photo in search_result_diction['photos']['photo']]
 
 # [PROBLEM 6] Get info from flickr about each photo id
 
@@ -142,20 +156,33 @@ def get_with_caching(base_url, params_diction, cache_diction, cache_fname, omitt
 #c) Pass the dictionary when constructing a new instance of Photo2
 #d) Accumulate the instance into a list, called photo_instances
 
-
-
+flickr_params_getInfo = {'method': 'flickr.photos.getInfo','format':'json','api_key':'f7d4239fe2b51ac9457d6dc1254d352b'}
+photo_instances = []
+for id in photo_ids_list:
+	flickr_params_getInfo['photo_id'] = id
+	response = get_with_caching(flickr_api_url, flickr_params_getInfo, saved_cache, cache_fname)
+	photo_info_dict = json.loads(strip_extra_chars(response))
+	photo_instances.append(Photo2(photo_info_dict))
+	
 # [PROBLEM 7] Accumulate frequencies of related tags.
 # You started out with data about 50 different photos, including the tags that the photo owners used to describe the photos. They all have the tag 'sunset', since that's the tag we searched for, but some have additional tags, like 'river' and 'nature' and others. Accumulate a dictionary of counts; call the dictionary counts_diction.
 
 # REF: See the chapter titled, "Accumulating Results in Dictionaries"
 
-
+counts_diction = {}
+for photo_instance in photo_instances:
+	for tag in photo_instance.tags:
+		if tag not in counts_diction:
+			counts_diction[tag] = 0
+		counts_diction[tag] = counts_diction[tag] + 1
+		
 # [PROBLEM 8] Sort the tags
 
 # Sort all the tags in descending order based on how often they were used in the 50 photos. Save the sorted list in a variable called sorted_tags.
 
 # REF: See the chapter titled, "Sorting"
 
+sorted_tags = sorted(counts_diction.keys(), key=lambda x: counts_diction[x], reverse=True)
 
 # [PROBLEM 9] Output five recommended tags
 
@@ -168,6 +195,10 @@ def get_with_caching(base_url, params_diction, cache_diction, cache_fname, omitt
 # REF: Slicing is in one of the early chapters, titled, "Sequences"
 
 print "Below this line, the 5 most frequently used tags should print out:"
+
+sliced_list = sorted_tags[1:6]
+for tag in sliced_list:
+	print tag
 
 print "-----------------done; output of diagnostic tests is below this line------------"
 ##### Code for running diagnostic tests are below this line. Don't change any code below this line######
@@ -234,4 +265,3 @@ class Problem8(unittest.TestCase):
 
 
 unittest.main(verbosity=2)
-
