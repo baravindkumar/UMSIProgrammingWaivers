@@ -108,7 +108,6 @@ def get_with_caching(base_url, params_diction, cache_diction, cache_fname, omitt
             filtered_params_diction[k] = params_diction[k]
     full_url = requestURL(base_url, filtered_params_diction)
     # step 1
-    print full_url
     if full_url in cache_diction:
         # step 2
         logging.info("retrieving cached result for " + full_url)
